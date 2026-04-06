@@ -1,2 +1,2 @@
 # AulaVivaBlog
-Un lugar para Efucar-nos
+Un lugar para Educar-nos
