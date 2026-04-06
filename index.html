@@ -265,7 +265,7 @@ button{cursor:pointer}
     <button class="tbtn" id="logoutBtn" style="display:none" onclick="logout()">Cerrar sesión</button>
   </div>
 </div>
-<div class="abanner" id="adminBanner"><div class="adot"></div><span id="bannerTxt">Modo administrador activo</span></div>
+<div class="abanner" id="adminBanner"><div class="adot"></div><span id="bannerTxt">Modo administrador activo</span><button onclick="resetAllData()" style="margin-left:auto;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:3px 12px;border-radius:12px;font-family:'DM Sans',sans-serif;font-size:10px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#8635; Restaurar original</button></div>
 
 <!-- HEADER -->
 <header class="hdr">
@@ -697,6 +697,37 @@ var DATA = {
   profile:{name:"Profesor Javier Aguilera",role:"Docente · UPEL · Universidad de Oriente",tagline:"«La educación es el arma más poderosa para cambiar el mundo»"}
 };
 
+// ─── PERSISTENCIA (localStorage) ───────────────────────────────────────────────
+var STORAGE_KEY = "aulavirus_data_v1";
+
+function saveData() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
+  catch(e) { console.warn("No se pudo guardar:", e); }
+}
+
+function loadData() {
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    var s = JSON.parse(raw);
+    if (s.news)     DATA.news     = s.news;
+    if (s.articles) DATA.articles = s.articles;
+    if (s.infos)    DATA.infos    = s.infos;
+    if (s.pres)     DATA.pres     = s.pres;
+    if (s.courses)  DATA.courses  = s.courses;
+    if (s.curios)   DATA.curios   = s.curios;
+    if (s.comments) DATA.comments = s.comments;
+    if (s.profile)  DATA.profile  = s.profile;
+  } catch(e) { console.warn("Error al cargar datos:", e); }
+}
+loadData();
+
+function resetAllData() {
+  if (!confirm("¿Restaurar el blog a su estado inicial? Se perderán todos los cambios.")) return;
+  localStorage.removeItem(STORAGE_KEY);
+  location.reload();
+}
+
 var activeCourseId  = DATA.courses[0] ? DATA.courses[0].id : null;
 var stSearchQ       = "";
 var editingCourseId = null;
@@ -859,9 +890,9 @@ function addCmt(id) {
   if (!n||!n.trim()||!tx||!tx.trim()) return;
   if (!DATA.comments[id]) DATA.comments[id] = [];
   DATA.comments[id].push({author:n.trim(), text:tx.trim()});
-  renderAll();
+  saveData(); renderAll();
 }
-function delCmt(id, i) { DATA.comments[id].splice(i,1); renderAll(); }
+function delCmt(id, i) { DATA.comments[id].splice(i,1); saveData(); renderAll(); }
 
 // ─── RENDER ALL ───────────────────────────────────────────────────────────────
 function renderAll() {
@@ -1026,7 +1057,7 @@ function addEval(courseId) {
   if (!course) return;
   course.evaluations.push(name);
   course.students.forEach(function(s){ s.grades.push(null); });
-  renderCourseView();
+  saveData(); renderCourseView();
 }
 function removeEval(courseId, idx) {
   var course = DATA.courses.find(function(c){ return c.id===courseId; });
@@ -1034,7 +1065,7 @@ function removeEval(courseId, idx) {
   if (!confirm('¿Quitar la evaluación "'+course.evaluations[idx]+'"? Se perderán las notas de esa columna.')) return;
   course.evaluations.splice(idx,1);
   course.students.forEach(function(s){ s.grades.splice(idx,1); });
-  renderCourseView();
+  saveData(); renderCourseView();
 }
 
 // ─── COURSE MODAL ─────────────────────────────────────────────────────────────
@@ -1066,13 +1097,13 @@ function saveCourse() {
     DATA.courses.push(nc);
     activeCourseId = nc.id;
   }
-  closeModal("courseModal"); renderAll();
+  closeModal("courseModal"); saveData(); renderAll();
 }
 function delCourse(id) {
   if (!confirm("¿Eliminar este curso y todos sus estudiantes?")) return;
   DATA.courses = DATA.courses.filter(function(c){ return c.id!==id; });
   activeCourseId = DATA.courses[0] ? DATA.courses[0].id : null;
-  renderAll();
+  saveData(); renderAll();
 }
 
 // ─── STUDENT MODAL ────────────────────────────────────────────────────────────
@@ -1107,13 +1138,13 @@ function saveStudent() {
     if (course.students.find(function(x){ return x.id===id; })) { alert("ID ya existe en este curso"); return; }
     course.students.push({id:id, name:name, grades:grades});
   }
-  closeModal("studentModal"); renderCourseView();
+  closeModal("studentModal"); saveData(); renderCourseView();
 }
 function delStudent(courseId, studentId) {
   if (!confirm("¿Eliminar este estudiante?")) return;
   var course = DATA.courses.find(function(c){ return c.id===courseId; });
   course.students = course.students.filter(function(s){ return s.id!==studentId; });
-  renderCourseView();
+  saveData(); renderCourseView();
 }
 
 // ─── CONTENT MODAL ────────────────────────────────────────────────────────────
@@ -1169,11 +1200,11 @@ function saveModal() {
     var idx = DATA[dsKey].findIndex(function(x){ return x.id===modalCtx.id; });
     DATA[dsKey][idx] = Object.assign({}, DATA[dsKey][idx], item);
   }
-  closeModal("contentModal"); renderAll();
+  closeModal("contentModal"); saveData(); renderAll();
 }
 function delItem(dsKey, id) {
   DATA[dsKey] = DATA[dsKey].filter(function(x){ return x.id!==id; });
-  renderAll();
+  saveData(); renderAll();
 }
 
 // ─── IMAGE ────────────────────────────────────────────────────────────────────
@@ -1228,7 +1259,7 @@ function saveProfile() {
   DATA.profile.tagline = document.getElementById("pTagline").value;
   document.getElementById("profName").textContent = DATA.profile.name;
   document.getElementById("profRole").textContent = DATA.profile.role;
-  closeModal("profileModal");
+  saveData(); closeModal("profileModal");
 }
 
 // ─── MODAL CLOSE ─────────────────────────────────────────────────────────────
