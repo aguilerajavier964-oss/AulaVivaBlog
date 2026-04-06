@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
@@ -697,36 +697,84 @@ var DATA = {
   profile:{name:"Profesor Javier Aguilera",role:"Docente · UPEL · Universidad de Oriente",tagline:"«La educación es el arma más poderosa para cambiar el mundo»"}
 };
 
-// ─── PERSISTENCIA (localStorage) ───────────────────────────────────────────────
-var STORAGE_KEY = "aulavirus_data_v1";
+// ─── BASE DE DATOS EN LA NUBE (Firebase) ─────────────────────────────────────
+// Solo necesitas pegar tu URL de Firebase abajo.
+// Ejemplo: "https://mi-proyecto-abc12-default-rtdb.firebaseio.com"
+var FIREBASE_URL = "https://aulavirus-default-rtdb.firebaseio.com/";  // ← reemplaza esto
 
+var DB_URL        = FIREBASE_URL + "/aulavirus.json";
+var _configured   = (FIREBASE_URL.indexOf("firebaseio.com") !== -1);
+var _saving       = false;
+var _saveQueued   = false;
+
+function showLoading(show) {
+  var el = document.getElementById("loadingBar");
+  if (el) el.style.display = show ? "block" : "none";
+}
+
+// Lee los datos desde Firebase al abrir el blog
+function loadData(callback) {
+  if (!_configured) {
+    if (callback) callback();
+    return;
+  }
+  showLoading(true);
+  fetch(DB_URL)
+  .then(function(r) { return r.json(); })
+  .then(function(s) {
+    if (s && typeof s === "object" && s !== null) {
+      if (s.news)     DATA.news     = s.news;
+      if (s.articles) DATA.articles = s.articles;
+      if (s.infos)    DATA.infos    = s.infos;
+      if (s.pres)     DATA.pres     = s.pres;
+      if (s.courses)  DATA.courses  = s.courses;
+      if (s.curios)   DATA.curios   = s.curios;
+      if (s.comments) DATA.comments = s.comments;
+      if (s.profile)  DATA.profile  = s.profile;
+    }
+    showLoading(false);
+    if (callback) callback();
+  })
+  .catch(function(e) {
+    console.warn("Error cargando datos:", e);
+    showLoading(false);
+    if (callback) callback();
+  });
+}
+
+// Guarda los datos en Firebase cada vez que el admin hace un cambio
 function saveData() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
-  catch(e) { console.warn("No se pudo guardar:", e); }
+  if (!_configured) return;
+  if (_saving) { _saveQueued = true; return; }
+  _saving = true;
+  fetch(DB_URL, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(DATA)
+  })
+  .then(function() {
+    _saving = false;
+    if (_saveQueued) { _saveQueued = false; saveData(); }
+  })
+  .catch(function(e) {
+    _saving = false;
+    console.warn("Error guardando:", e);
+  });
 }
 
-function loadData() {
-  try {
-    var raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    var s = JSON.parse(raw);
-    if (s.news)     DATA.news     = s.news;
-    if (s.articles) DATA.articles = s.articles;
-    if (s.infos)    DATA.infos    = s.infos;
-    if (s.pres)     DATA.pres     = s.pres;
-    if (s.courses)  DATA.courses  = s.courses;
-    if (s.curios)   DATA.curios   = s.curios;
-    if (s.comments) DATA.comments = s.comments;
-    if (s.profile)  DATA.profile  = s.profile;
-  } catch(e) { console.warn("Error al cargar datos:", e); }
-}
-loadData();
-
+// Restaura el blog a su contenido original
 function resetAllData() {
-  if (!confirm("¿Restaurar el blog a su estado inicial? Se perderán todos los cambios.")) return;
-  localStorage.removeItem(STORAGE_KEY);
-  location.reload();
+  if (!confirm("\u00bfRestaurar el blog a su estado inicial? Se perder\u00e1n todos los cambios.")) return;
+  fetch(DB_URL, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(INITIAL_DATA)
+  }).then(function(){ location.reload(); }).catch(function(){ location.reload(); });
 }
+
+
+// Snapshot del estado original (para reset)
+var INITIAL_DATA = JSON.parse(JSON.stringify(DATA));
 
 var activeCourseId  = DATA.courses[0] ? DATA.courses[0].id : null;
 var stSearchQ       = "";
@@ -1272,7 +1320,18 @@ function closeModal(id) { document.getElementById(id).classList.remove("show"); 
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 applyT();
-renderAll();
+// Cargar datos desde la nube antes de renderizar
+loadData(function() {
+  activeCourseId = DATA.courses[0] ? DATA.courses[0].id : null;
+  renderAll();
+  // Aplicar nombre del docente guardado en perfil
+  document.getElementById("profName").textContent = DATA.profile.name;
+  document.getElementById("profRole").textContent = DATA.profile.role;
+});
 </script>
+
+<!-- LOADING BAR -->
+<div id="loadingBar" style="display:none;position:fixed;top:0;left:0;width:100%;height:3px;background:linear-gradient(90deg,#B84C3A,#D4735F,#B84C3A);background-size:200%;animation:lbar 1.2s linear infinite;z-index:9999"></div>
+<style>@keyframes lbar{0%{background-position:200% 0}100%{background-position:-200% 0}}</style>
 </body>
 </html>
